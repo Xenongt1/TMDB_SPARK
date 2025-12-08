@@ -1,9 +1,10 @@
-TMDB Movie Analytics
+# TMDB Movie Analytics
 
-Overview
+**Overview**
 This project collects movie data from the TMDB API, prepares it for analysis, and explores performance patterns across budget, revenue, ratings, franchises, and popularity. The workflow follows a standard data pipeline that includes extraction, cleaning, transformation, KPI development, and visualization.
 
-Data Extraction
+# Data Extraction
+
 Movie information is retrieved directly from the TMDB API for a chosen list of movie IDs. Each API response includes details such as:
 
 Titles, summaries, and release dates
@@ -16,7 +17,8 @@ Budgets, revenues, popularity, and ratings
 
 All responses are stored and compiled into a Pandas DataFrame.
 
-Data Cleaning and Transformation
+# Data Cleaning and Transformation
+
 The raw API output contains nested dictionaries, inconsistent formats, and missing values.
 Key cleaning steps include:
 
@@ -34,7 +36,8 @@ Reordering columns for clarity
 
 This results in a structured dataset suitable for analysis.
 
-KPI Analysis
+# KPI Analysis
+
 Several performance metrics are calculated to compare movies and identify trends. These include:
 
 Highest revenue, budget, profit, and ROI
@@ -51,7 +54,8 @@ Custom search queries combining genres, cast, and directors
 
 A reusable ranking function is used to generate consistent KPI tables.
 
-Visualizations
+# Visualizations
+
 Matplotlib is used to explore relationships and historical patterns through:
 
 Budget vs. revenue scatterplots
