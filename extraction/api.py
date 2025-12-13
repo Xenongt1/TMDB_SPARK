@@ -3,13 +3,13 @@ import time
 import requests
 import pandas as pd
 from typing import List, Dict, Optional
-from src.config import TMDB_API_KEY, BASE_URL
+from config.settings import BASE_URL, TMDB_API_KEY as API_KEY
 
 def fetch_single_movie(movie_id: int, max_attempts: int = 3) -> Optional[Dict]:
     """
     Fetch details for a single movie by ID with retries.
     """
-    url = f"{BASE_URL}/{movie_id}?api_key={TMDB_API_KEY}&append_to_response=credits"
+    url = f"{BASE_URL}/{movie_id}?api_key={API_KEY}&append_to_response=credits"
     attempts = 0
     
     while attempts < max_attempts:
