@@ -1,29 +1,28 @@
-# TMDB Movie Data Pipeline
+# TMDB Movie Data Pipeline (PySpark)
 
 ## Overview
-This project processes TMDB movie data using a modular Python pipeline. It demonstrates a complete ETL (Extraction, Transformation, Load/Analysis) workflow, calculating key performance indicators (KPIs) and generating visualizations for movie revenue, ROI, and franchise performance.
+This project processes TMDB movie data using a **distributed PySpark pipeline**. It demonstrates a scalable ETL (Extraction, Transformation, Load/Analysis) workflow, calculating key performance indicators (KPIs) and generating visualizations for movie revenue, ROI, and franchise performance using **native Spark SQL functions** instead of Pandas.
 
 ## Features
+- **Distributed Processing**: Powered by PySpark for scalability.
+- **Native Spark Functions**: Uses `pyspark.sql.functions` for high-performance data transformation (avoids Python UDFs).
 - **Modular Architecture**: Code is organized into `extraction`, `transformation`, `analysis`, and `visualization` packages.
-- **Robust API Fetching**: Handles retries and error checking when fetching data from TMDB.
-- **In-Memory Processing**: Data is processed purely as Pandas DataFrames in memory.
 - **Rich Outputs**:
     - **Data**: Saved as **HTML Tables** for easy inspection (`outputs/data/`).
     - **Plots**: Saved as high-quality PNG images (`outputs/plots/`).
-- **Live Notebook**: A Jupyter Notebook (`final_report.ipynb`) that runs the pipeline live and displays interactive tables and plots.
 
 ## Project Structure
 ```
 .
 ├── extraction/         # API Request Logic
 │   └── api.py
-├── transformation/     # Data Cleaning & Parsing
+├── transformation/     # Data Cleaning & Parsing (Spark)
 │   └── cleaning.py
-├── analysis/           # KPIs, Rankings, & Comparisons
+├── analysis/           # KPIs, Rankings, & Comparisons (Spark)
 │   └── analysis.py
-├── visualization/      # Plotting Functions
+├── visualization/      # Plotting Functions (Pandas Interface)
 │   └── plots.py
-├── pipeline/           # Orchestration
+├── pipeline/           # Orchestration (SparkSession)
 │   └── runner.py
 ├── config/             # Settings & Keys
 │   └── settings.py
@@ -38,19 +37,24 @@ This project processes TMDB movie data using a modular Python pipeline. It demon
 
 ## Setup & Installation
 
-1.  **Clone the Repository**:
+1.  **Prerequisites**:
+    - Python 3.8+
+    - **Java JDK (8, 11, or 17)** is required for PySpark.
+    - Git
+
+2.  **Clone the Repository**:
     ```bash
-    git clone https://github.com/Xenongt1/TMDB-FETCH.git
-    cd TMDB-FETCH
+    git clone https://github.com/Xenongt1/TMDB_SPARK.git
+    cd TMDB_SPARK
     ```
 
-2.  **Install Dependencies**:
+3.  **Install Dependencies**:
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **Configure API Key**:
-    - Create a `.env` file in the root directory (copy `.env.example`).
+4.  **Configure API Key**:
+    - Create a `.env` file in the root directory (copy `.env.example` if available, or just create one).
     - Add your TMDB API Key:
       ```
       TMDB_API_KEY=your_api_key_here
@@ -58,17 +62,12 @@ This project processes TMDB movie data using a modular Python pipeline. It demon
 
 ## Usage
 
-### Option 1: Run the Pipeline (Command Line)
-To execute the full ETL process, generate HTML tables, and save plots:
+### Run the Pipeline
+To execute the full ETL process using Spark:
 ```bash
 python3 -m pipeline.runner
 ```
 *Results will be saved to `outputs/`.*
-
-### Option 2: Run the Notebook (Interactive)
-To view the analysis dynamically with styled tables and inline plots:
-1. Open `notebooks/final_report.ipynb` in Jupyter Lab or VS Code.
-2. Run all cells.
 
 ## Outputs
 - **`outputs/data/cleaned_movies.html`**: The fully processed dataset.
