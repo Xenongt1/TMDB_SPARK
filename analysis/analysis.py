@@ -146,16 +146,16 @@ def compare_franchise_vs_standalone(df: DataFrame) -> DataFrame:
     if df is None or "belongs_to_collection" not in df.columns:
         return None
         
-    df_aug = df.withColumn("is_franchise", F.col("belongs_to_collection").isNotNull())
+    df_aug = df.withColumn("collection_status", 
+        F.when(F.col("belongs_to_collection").isNotNull(), "Franchise").otherwise("Standalone")
+    )
     
-    comp = df_aug.groupBy("is_franchise").agg(
+    comp = df_aug.groupBy("collection_status").agg(
         F.mean("revenue_musd").alias("revenue_musd"),
         F.mean("budget_musd").alias("budget_musd"),
         F.mean("popularity").alias("popularity"),
         F.mean("vote_average").alias("vote_average"),
-        F.expr("percentile_approx(roi, 0.5)").alias("roi")  # Median in Spark
+        F.expr("percentile_approx(roi, 0.5)").alias("median_roi")
     )
     
-    # To match Pandas behavior roughly: return DataFrame with boolean column
-    # The caller can then toPandas() and rename index if needed.
     return comp
