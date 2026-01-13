@@ -1,82 +1,130 @@
 
 import os
-import shutil
-import pandas as pd
-from src.config import MOVIE_IDS
-from src.api import fetch_movie_data
-from src.cleaning import clean_movie_data
-from src.analysis import (
+from pyspark.sql import SparkSession
+from config.settings import MOVIE_IDS
+from extraction.api import fetch_movie_data
+from transformation.cleaning import clean_movie_data
+from analysis.analysis import (
     calculate_kpis, rank_movies, get_franchise_performance, get_director_performance
 )
-from src.visualization import (
+from visualization.plots import (
     set_style, plot_revenue_vs_budget, plot_roi_by_genre, 
     plot_popularity_vs_rating, plot_franchise_comparison, plot_yearly_trends
 )
+from config.logger import setup_logger
+
+logger = setup_logger()
 
 def main():
-    print("=== TMDB Data Pipeline Started ===")
+    logger.info("=== TMDB Data Pipeline Started (PySpark) ===")
+    
+    # Initialize Spark Session
+    # Using local[*] to run on all available cores
+    spark = SparkSession.builder \
+        .appName("TMDB_Pipeline") \
+        .master("local[*]") \
+        .getOrCreate()
+        
+    spark.sparkContext.setLogLevel("WARN")
     
     # Setup directories
     os.makedirs('outputs/data', exist_ok=True)
     os.makedirs('outputs/plots', exist_ok=True)
     
     # 1. Fetch Data
-    print("\n--- Step 1: Fetching Data ---")
-    raw_df = fetch_movie_data(MOVIE_IDS)
-    if raw_df.empty:
-        print("No data fetched. Exiting.")
+    logger.info("--- Step 1: Fetching Data ---")
+    raw_data_list = fetch_movie_data(MOVIE_IDS)
+    if not raw_data_list:
+        logger.error("No data fetched. Exiting.")
         return
+        
+    # Create Spark DataFrame from list of dicts
+    logger.info("Creating Spark DataFrame...")
+    # inferSchema=True is convenient but can be slow for huge data. 
+    # For this scale, it's fine.
+    raw_df = spark.createDataFrame(data=raw_data_list)
     
-    # Save raw data (HTML)
-    raw_df.to_html('outputs/data/raw_movies.html', index=False)
-    print("Raw data saved to outputs/data/raw_movies.html")
+    # Save raw data (HTML) -> Convert to Pandas solely for the HTML dump as per requirement
+    # In a real big data pipeline, we would write to Parquet/CSV.
+    try:
+        raw_pd = raw_df.toPandas()
+        raw_pd.to_html('outputs/data/raw_movies.html', index=False)
+        logger.info("Raw data saved to outputs/data/raw_movies.html")
+    except Exception as e:
+        logger.error(f"Failed to save raw html: {e}")
 
     # 2. Clean Data
-    print("\n--- Step 2: Cleaning Data ---")
+    logger.info("--- Step 2: Cleaning Data ---")
     cleaned_df = clean_movie_data(raw_df)
     
+    # Cache cleaned data as it's used multiple times
+    cleaned_df.cache()
+    
     # Save cleaned data (HTML)
-    cleaned_df.to_html('outputs/data/cleaned_movies.html', index=False)
-    print("Cleaned data saved to outputs/data/cleaned_movies.html")
+    try:
+        cleaned_pd = cleaned_df.toPandas()
+        cleaned_pd.to_html('outputs/data/cleaned_movies.html', index=False)
+        logger.info("Cleaned data saved to outputs/data/cleaned_movies.html")
+    except Exception as e:
+        logger.error(f"Failed to save cleaned html: {e}")
 
     # 3. Analyze & KPIs
-    print("\n--- Step 3: Analysis & KPIs ---")
+    logger.info("--- Step 3: Analysis & KPIs ---")
     df = calculate_kpis(cleaned_df)
     
     # Top 5 Revenue
     top_revenue = rank_movies(df, 'revenue_musd', top_n=5, ascending=False)
-    print("\nTop 5 Movies by Revenue:")
-    print(top_revenue[['title', 'revenue_musd']])
+    if top_revenue:
+        print("\nTop 5 Movies by Revenue:")
+        top_revenue.show(truncate=False)
 
     # Top 5 ROI (Budget >= 10M)
     top_roi = rank_movies(df, 'roi', top_n=5, ascending=False, min_budget=10)
-    print("\nTop 5 Movies by ROI (Budget >= 10M):")
-    print(top_roi[['title', 'roi']])
+    if top_roi:
+        print("\nTop 5 Movies by ROI (Budget >= 10M):")
+        top_roi.show(truncate=False)
     
     # Franchise Performance
     franchises = get_franchise_performance(df)
-    if not franchises.empty:
+    if franchises:
         print("\nTop Franchises by Revenue:")
-        print(franchises[['total_revenue', 'avg_rating']].head())
+        franchises.select('belongs_to_collection', 'total_revenue', 'avg_rating').show(5, truncate=False)
 
     # Director Performance
     directors = get_director_performance(df)
-    if not directors.empty:
+    if directors:
         print("\nTop Directors by Revenue:")
-        print(directors[['total_revenue', 'avg_rating']].head())
+        directors.select('director', 'total_revenue', 'avg_rating').show(5, truncate=False)
 
     # 4. Visualization
-    print("\n--- Step 4: Visualization ---")
+    logger.info("--- Step 4: Visualization ---")
+    # Visualization libraries only work with Pandas. 
+    # We collect the necessary data to the driver.
+    
+    # Collect main dataset for plotting
+    df_pd = df.toPandas()
+    
     set_style()
     
-    plot_revenue_vs_budget(df, save_path='outputs/plots/revenue_vs_budget.png', show=False)
-    plot_roi_by_genre(df, save_path='outputs/plots/roi_by_genre.png', show=False)
-    plot_popularity_vs_rating(df, save_path='outputs/plots/popularity_vs_rating.png', show=False)
-    plot_yearly_trends(df, save_path='outputs/plots/yearly_trends.png', show=False)
-    plot_franchise_comparison(franchises, save_path='outputs/plots/franchise_comparison.png', show=False)
+    plot_revenue_vs_budget(df_pd, save_path='outputs/plots/revenue_vs_budget.png', show=False)
+    plot_roi_by_genre(df_pd, save_path='outputs/plots/roi_by_genre.png', show=False)
+    plot_popularity_vs_rating(df_pd, save_path='outputs/plots/popularity_vs_rating.png', show=False)
+    plot_yearly_trends(df_pd, save_path='outputs/plots/yearly_trends.png', show=False)
+    
+    if franchises:
+        # Collect franchise data for plotting
+        franchises_pd = franchises.toPandas()
+        # Rename index to match what the plot function expects if it relied on index
+        # The plot function uses columns: 'total_revenue', 'avg_rating'. 
+        # But wait, original code expected the franchise name to be the index.
+        # Our Spark aggregation put 'belongs_to_collection' as a column.
+        franchises_pd.set_index('belongs_to_collection', inplace=True)
+        
+        plot_franchise_comparison(franchises_pd, save_path='outputs/plots/franchise_comparison.png', show=False)
 
-    print("\n=== Pipeline Completed Successfully ===")
-    print("Outputs saved to outputs/data/ and outputs/plots/")
+    logger.info("=== Pipeline Completed Successfully ===")
+    
+    spark.stop()
 
 if __name__ == "__main__":
     main()

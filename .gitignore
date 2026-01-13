@@ -19,3 +19,4 @@ ENV/
 
 # Outputs
 outputs/
+logs/
