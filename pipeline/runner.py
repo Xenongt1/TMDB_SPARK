@@ -39,10 +39,12 @@ def main():
         return
         
     # Create Spark DataFrame from list of dicts
-    logger.info("Creating Spark DataFrame...")
-    # inferSchema=True is convenient but can be slow for huge data. 
-    # For this scale, it's fine.
-    raw_df = spark.createDataFrame(data=raw_data_list)
+    logger.info("Creating Spark DataFrame via JSON RDD for robustness...")
+    import json
+    # Convert list of dicts to RDD of JSON strings
+    json_rdd = spark.sparkContext.parallelize([json.dumps(r) for r in raw_data_list])
+    # Read JSON RDD (Spark automatically infers complex nested schema)
+    raw_df = spark.read.json(json_rdd)
     
     # Save raw data (HTML) -> Convert to Pandas solely for the HTML dump as per requirement
     # In a real big data pipeline, we would write to Parquet/CSV.

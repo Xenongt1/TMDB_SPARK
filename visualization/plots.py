@@ -121,6 +121,7 @@ def plot_yearly_trends(df: pd.DataFrame, save_path: str = None, show: bool = Tru
     if df.empty or 'release_date' not in df.columns or 'revenue_musd' not in df.columns:
         return
 
+    df['release_date'] = pd.to_datetime(df['release_date'])
     df['year'] = df['release_date'].dt.year
     yearly_revenue = df.groupby('year')['revenue_musd'].sum().reset_index()
 
