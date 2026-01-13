@@ -139,3 +139,42 @@ def plot_yearly_trends(df: pd.DataFrame, save_path: str = None, show: bool = Tru
         plt.show()
     else:
         plt.close()
+
+def plot_franchise_vs_standalone(comp_df: pd.DataFrame, save_path: str = None, show: bool = True):
+    """
+    Bar plot comparing Franchise vs Standalone movies metrics.
+    Expects DataFrame with index/column 'collection_status' (Franchise/Standalone).
+    """
+    if comp_df.empty:
+        return
+
+    # Reset index if 'collection_status' is in index
+    if 'collection_status' not in comp_df.columns and comp_df.index.name == 'collection_status':
+        comp_df = comp_df.reset_index()
+
+    if 'collection_status' not in comp_df.columns:
+        print("Missing 'collection_status' column for comparison plot.")
+        return
+
+    # Melt for grouped bar chart
+    metrics = ['revenue_musd', 'budget_musd', 'vote_average', 'median_roi']
+    # Filter only available metrics
+    metrics = [m for m in metrics if m in comp_df.columns]
+    
+    df_melted = comp_df.melt(id_vars='collection_status', value_vars=metrics, var_name='Metric', value_name='Value')
+
+    plt.figure(figsize=(12, 6))
+    sns.barplot(data=df_melted, x='Metric', y='Value', hue='collection_status', palette='Set2')
+    
+    plt.title('Franchise vs Standalone Performance Comparison', fontsize=16)
+    plt.ylabel('Value (Scales vary)')
+    plt.xlabel('Metric')
+    
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+        print(f"Saved plot to {save_path}")
+
+    if show:
+        plt.show()
+    else:
+        plt.close()
