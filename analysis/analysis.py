@@ -101,3 +101,61 @@ def get_director_performance(df: DataFrame) -> DataFrame:
     )
     
     return directors.orderBy(F.col('total_revenue').desc())
+
+def filter_bruce_willis_scifi(df: DataFrame) -> DataFrame:
+    """
+    Search 1: Find the best-rated Science Fiction Action movies starring Bruce Willis.
+    Sorted by Rating (highest to lowest).
+    """
+    if df is None: return None
+    
+    # 'genres' is a string ("Action | Sci-Fi") in the cleaned Spark DF due to array_join
+    # 'cast' is an array of strings in cleaned DF
+    
+    # Spark "array_contains" check for cast if it's an array
+    # If cast is array<string>
+    cast_cond = F.expr("array_contains(cast, 'Bruce Willis')")
+    
+    # Genres check (string contains)
+    genre_cond = F.col("genres").contains("Science Fiction") & F.col("genres").contains("Action")
+    
+    filtered = df.filter(cast_cond & genre_cond).orderBy(F.col("vote_average").desc())
+    return filtered.select("title", "vote_average", "genres", "release_date")
+
+def filter_uma_tarantino(df: DataFrame) -> DataFrame:
+    """
+    Search 2: Find movies starring Uma Thurman, directed by Quentin Tarantino.
+    Sorted by runtime (shortest to longest).
+    """
+    if df is None: return None
+    
+    cast_cond = F.expr("array_contains(cast, 'Uma Thurman')")
+    director_cond = F.col("director") == "Quentin Tarantino"
+    
+    filtered = df.filter(cast_cond & director_cond)
+    
+    if "runtime" in df.columns:
+        filtered = filtered.orderBy(F.col("runtime").asc())
+        
+    return filtered.select("title", "director", "runtime", "release_date")
+
+def compare_franchise_vs_standalone(df: DataFrame) -> DataFrame:
+    """
+    Compare attributes of Franchise movies vs Standalone movies.
+    """
+    if df is None or "belongs_to_collection" not in df.columns:
+        return None
+        
+    df_aug = df.withColumn("is_franchise", F.col("belongs_to_collection").isNotNull())
+    
+    comp = df_aug.groupBy("is_franchise").agg(
+        F.mean("revenue_musd").alias("revenue_musd"),
+        F.mean("budget_musd").alias("budget_musd"),
+        F.mean("popularity").alias("popularity"),
+        F.mean("vote_average").alias("vote_average"),
+        F.expr("percentile_approx(roi, 0.5)").alias("roi")  # Median in Spark
+    )
+    
+    # To match Pandas behavior roughly: return DataFrame with boolean column
+    # The caller can then toPandas() and rename index if needed.
+    return comp
