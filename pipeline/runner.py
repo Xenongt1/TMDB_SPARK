@@ -1,5 +1,5 @@
-
 import os
+import json
 from pyspark.sql import SparkSession
 from config.settings import MOVIE_IDS
 from extraction.api import fetch_movie_data
@@ -40,20 +40,17 @@ def main():
         
     # Create Spark DataFrame from list of dicts
     logger.info("Creating Spark DataFrame via JSON RDD for robustness...")
-    import json
     # Convert list of dicts to RDD of JSON strings
     json_rdd = spark.sparkContext.parallelize([json.dumps(r) for r in raw_data_list])
     # Read JSON RDD (Spark automatically infers complex nested schema)
     raw_df = spark.read.json(json_rdd)
     
-    # Save raw data (HTML) -> Convert to Pandas solely for the HTML dump as per requirement
-    # In a real big data pipeline, we would write to Parquet/CSV.
+    # Save raw data as Parquet (Standard for Spark pipelines)
     try:
-        raw_pd = raw_df.toPandas()
-        raw_pd.to_html('outputs/data/raw_movies.html', index=False)
-        logger.info("Raw data saved to outputs/data/raw_movies.html")
+        raw_df.write.mode("overwrite").parquet('outputs/data/raw_movies.parquet')
+        logger.info("Raw data saved to outputs/data/raw_movies.parquet")
     except Exception as e:
-        logger.error(f"Failed to save raw html: {e}")
+        logger.error(f"Failed to save raw parquet: {e}")
 
     # 2. Clean Data
     logger.info("--- Step 2: Cleaning Data ---")
@@ -62,13 +59,26 @@ def main():
     # Cache cleaned data as it's used multiple times
     cleaned_df.cache()
     
-    # Save cleaned data (HTML)
+    # Save cleaned data as Parquet
     try:
-        cleaned_pd = cleaned_df.toPandas()
-        cleaned_pd.to_html('outputs/data/cleaned_movies.html', index=False)
-        logger.info("Cleaned data saved to outputs/data/cleaned_movies.html")
+        cleaned_df.write.mode("overwrite").parquet('outputs/data/cleaned_movies.parquet')
+        logger.info("Cleaned data saved to outputs/data/cleaned_movies.parquet")
+        
+        # Save a human-readable CSV preview (first 100 rows)
+        # We need to flatten array columns (cast, genres, etc.) because CSV doesn't support complex types
+        from pyspark.sql.functions import col, concat_ws
+        
+        # Identify array columns
+        array_cols = [f.name for f in cleaned_df.schema.fields if "ArrayType" in str(f.dataType)]
+        
+        preview_df = cleaned_df.limit(100)
+        for c in array_cols:
+            preview_df = preview_df.withColumn(c, concat_ws(", ", col(c)))
+            
+        preview_df.coalesce(1).write.mode("overwrite").option("header", "true").csv('outputs/data/cleaned_movies_preview.csv')
+        logger.info("Human-readable preview saved to outputs/data/cleaned_movies_preview.csv")
     except Exception as e:
-        logger.error(f"Failed to save cleaned html: {e}")
+        logger.error(f"Failed to save cleaned data exports: {e}")
 
     # 3. Analyze & KPIs
     logger.info("--- Step 3: Analysis & KPIs ---")

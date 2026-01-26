@@ -8,7 +8,7 @@ This project processes TMDB movie data using a **distributed PySpark pipeline**.
 - **Native Spark Functions**: Uses `pyspark.sql.functions` for high-performance data transformation (avoids Python UDFs).
 - **Modular Architecture**: Code is organized into `extraction`, `transformation`, `analysis`, and `visualization` packages.
 - **Rich Outputs**:
-    - **Data**: Saved as **HTML Tables** for easy inspection (`outputs/data/`).
+    - **Data**: Saved as compressed **Parquet files** for Spark processing, with **CSV previews** for human inspection (`outputs/data/`).
     - **Plots**: Saved as high-quality PNG images (`outputs/plots/`).
 
 ## Project Structure
@@ -70,7 +70,9 @@ python3 -m pipeline.runner
 *Results will be saved to `outputs/`.*
 
 ## Outputs
-- **`outputs/data/cleaned_movies.html`**: The fully processed dataset.
+- **`outputs/data/`**:
+    - `cleaned_movies.parquet/`: The fully processed dataset in optimized binary format.
+    - `cleaned_movies_preview.csv/`: A human-readable snippet (top 100 rows) for quick inspection.
 - **`outputs/plots/`**:
     - `revenue_vs_budget.png`
     - `roi_by_genre.png`
